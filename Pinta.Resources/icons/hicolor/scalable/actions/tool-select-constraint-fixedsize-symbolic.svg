@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16" height="16" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <!-- Solid rectangle representing fixed size -->
+  <rect x="3" y="4" width="10" height="8" rx="0.5"
+        style="fill:none;stroke:#bebebe;stroke-width:1.2"/>
+  <!-- Width dimension line at top -->
+  <line x1="3" y1="2.5" x2="13" y2="2.5" style="stroke:#bebebe;stroke-width:0.8"/>
+  <line x1="3" y1="1.5" x2="3" y2="3.5" style="stroke:#bebebe;stroke-width:0.8"/>
+  <line x1="13" y1="1.5" x2="13" y2="3.5" style="stroke:#bebebe;stroke-width:0.8"/>
+  <!-- Height dimension line at right -->
+  <line x1="14.5" y1="4" x2="14.5" y2="12" style="stroke:#bebebe;stroke-width:0.8"/>
+  <line x1="13.5" y1="4" x2="15.5" y2="4" style="stroke:#bebebe;stroke-width:0.8"/>
+  <line x1="13.5" y1="12" x2="15.5" y2="12" style="stroke:#bebebe;stroke-width:0.8"/>
+</svg>

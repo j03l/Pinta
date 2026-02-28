@@ -166,6 +166,10 @@ public static class Icons
 	public const string LassoFreeform = "tool-select-lasso-freeform-symbolic";
 	public const string LassoPolygon = "tool-select-lasso-polygon-symbolic";
 
+	public const string SelectConstraintAnySize = "tool-select-constraint-anysize-symbolic";
+	public const string SelectConstraintRatio = "tool-select-constraint-ratio-symbolic";
+	public const string SelectConstraintFixedSize = "tool-select-constraint-fixedsize-symbolic";
+
 	public const string HelpBug = "help-bug";
 	public const string HelpTranslate = "help-translate";
 	public const string HelpWebsite = "help-website-symbolic";

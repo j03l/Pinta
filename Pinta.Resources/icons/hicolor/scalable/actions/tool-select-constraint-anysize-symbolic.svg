@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16" height="16" viewBox="0 0 16 16" version="1.1" xmlns="http://www.w3.org/2000/svg">
+  <!-- Dashed rectangle representing unconstrained selection -->
+  <rect x="2" y="3" width="12" height="10" rx="0.5"
+        style="fill:none;stroke:#bebebe;stroke-width:1.2;stroke-dasharray:2,1.5"/>
+  <!-- Diagonal double-headed arrow suggesting free resize -->
+  <line x1="5" y1="11" x2="11" y2="5" style="stroke:#bebebe;stroke-width:1.2"/>
+  <polyline points="9.5,5 11,5 11,6.5" style="fill:none;stroke:#bebebe;stroke-width:1.2"/>
+  <polyline points="6.5,11 5,11 5,9.5" style="fill:none;stroke:#bebebe;stroke-width:1.2"/>
+</svg>

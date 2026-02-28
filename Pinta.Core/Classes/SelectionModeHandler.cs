@@ -53,7 +53,7 @@ public sealed class SelectionModeHandler
 
 	public void BuildToolbar (Gtk.Box tb, ISettingsService settings)
 	{
-		selection_label ??= Gtk.Label.New (Translations.GetString (" Selection Mode: "));
+		selection_label ??= Gtk.Label.New (Translations.GetString (" Selection mode: "));
 
 		tb.Append (selection_label);
 
@@ -101,6 +101,7 @@ public sealed class SelectionModeHandler
 	{
 		doc.Selection = doc.PreviousSelection.Clone ();
 		doc.Selection.Visible = true;
+		doc.Selection.HandleBounds = RectangleD.Zero;
 
 		//Make sure time isn't wasted if the CombineMode is Replace - Replace is much simpler than the other 4 selection modes.
 		switch (mode) {

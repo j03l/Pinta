@@ -29,6 +29,10 @@ internal static class SettingNames
 
 	internal const string LASSO_MODE = "lasso-mode";
 
+	internal const string SELECTION_CONSTRAINT_MODE = "selection-constraint-mode";
+	internal const string SELECTION_CONSTRAINT_WIDTH = "selection-constraint-width";
+	internal const string SELECTION_CONSTRAINT_HEIGHT = "selection-constraint-height";
+
 	internal static string Arrow1 (string prefix)
 		=> $"{prefix}-arrow1";
 

@@ -8,6 +8,9 @@
 - hicolor/scalable/actions/join-round-symbolic.svg
 - hicolor/scalable/actions/tool-select-lasso-freeform-symbolic.png
 - hicolor/scalable/actions/tool-select-lasso-polygon-symbolic.svg
+- hicolor/scalable/actions/tool-select-constraint-anysize-symbolic.svg
+- hicolor/scalable/actions/tool-select-constraint-ratio-symbolic.svg
+- hicolor/scalable/actions/tool-select-constraint-fixedsize-symbolic.svg
 - hicolor/scalable/actions/text-bold-symbolic.svg
 - hicolor/scalable/actions/text-extra-bold-symbolic.svg
 - hicolor/scalable/actions/text-extra-light-symbolic.svg

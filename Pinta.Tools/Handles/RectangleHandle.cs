@@ -110,7 +110,8 @@ public class RectangleHandle : IToolHandle
 	/// Updates the rectangle as the mouse is moved.
 	/// </summary>
 	/// <returns>The region to redraw with InvalidateWindowRect()</returns>
-	public RectangleI UpdateDrag (PointD canvasPos, bool shiftPressed)
+	public RectangleI UpdateDrag (PointD canvasPos, bool shiftPressed,
+		int constraintMode = 0, double constraintW = 1, double constraintH = 1)
 	{
 		if (!IsDragging || active_handle is null)
 			throw new InvalidOperationException ("Drag operation has not been started!");
@@ -123,7 +124,8 @@ public class RectangleHandle : IToolHandle
 		RectangleI dirty = ComputeInvalidateRect ();
 
 		HandlePoint activeHandlePoint = handles.First (kvp => kvp.Value == active_handle).Key;
-		MoveActiveHandle (activeHandlePoint, canvasPos.X, canvasPos.Y, shiftPressed);
+		MoveActiveHandle (activeHandlePoint, canvasPos.X, canvasPos.Y, shiftPressed,
+			constraintMode, constraintW, constraintH);
 		UpdateHandlePositions ();
 
 		dirty = dirty.Union (ComputeInvalidateRect ());
@@ -193,43 +195,99 @@ public class RectangleHandle : IToolHandle
 			active_handle = handles[HandlePoint.LowerRight];
 	}
 
-	private bool IsHigherThanWide ()
+	/// <summary>
+	/// Computes a ratio-constrained position for the adjusted corner relative to an
+	/// anchor corner, ensuring coordinates stay within image bounds.
+	/// </summary>
+	private (double X, double Y) ApplyRatioWithBounds (
+		double anchorX, double anchorY,
+		double mouseX, double mouseY,
+		double rW, double rH)
 	{
-		return end_pt.X - start_pt.X <= end_pt.Y - start_pt.Y;
+		double dx = mouseX - anchorX;
+		double dy = mouseY - anchorY;
+
+		// Option A: derive X from Y (constrain width to match height's ratio).
+		double optA_X = anchorX + dy * rW / rH;
+		// Option B: derive Y from X (constrain height to match width's ratio).
+		double optB_Y = anchorY + dx * rH / rW;
+
+		bool optA_ok = optA_X >= 0 && optA_X <= image_size.Width;
+		bool optB_ok = optB_Y >= 0 && optB_Y <= image_size.Height;
+
+		// Prefer the option that gives the larger selection (same as IsNarrowerThanRatio).
+		bool preferA = Math.Abs (dx) * rH <= Math.Abs (dy) * rW;
+
+		if (preferA && optA_ok)
+			return (optA_X, mouseY);
+		if (!preferA && optB_ok)
+			return (mouseX, optB_Y);
+		// Fallback: try the other option.
+		if (optA_ok)
+			return (optA_X, mouseY);
+		if (optB_ok)
+			return (mouseX, optB_Y);
+
+		// Neither fits: clamp the preferred option and re-derive.
+		if (preferA) {
+			double clampedX = Math.Clamp (optA_X, 0, image_size.Width);
+			double derivedY = anchorY + (clampedX - anchorX) * rH / rW;
+			return (clampedX, derivedY);
+		} else {
+			double clampedY = Math.Clamp (optB_Y, 0, image_size.Height);
+			double derivedX = anchorX + (clampedY - anchorY) * rW / rH;
+			return (derivedX, clampedY);
+		}
 	}
 
-	private void ExpandUniformlyX ()
+	/// <summary>
+	/// Adjusts the width (X dimension) to match the given ratio, centered horizontally.
+	/// Clamps to image bounds.
+	/// </summary>
+	private void ExpandToRatioX (double ratioW, double ratioH)
 	{
 		double x_average = (start_pt.X + end_pt.X) / 2;
 		double y_distance = (end_pt.Y - start_pt.Y) / 2;
+		double x_distance = y_distance * ratioW / ratioH;
 
-		start_pt = start_pt with { X = x_average - y_distance };
-		end_pt = end_pt with { X = x_average + y_distance };
+		start_pt = start_pt with { X = Math.Clamp (x_average - x_distance, 0, image_size.Width) };
+		end_pt = end_pt with { X = Math.Clamp (x_average + x_distance, 0, image_size.Width) };
 	}
 
-	private void ExpandUniformlyY ()
+	/// <summary>
+	/// Adjusts the height (Y dimension) to match the given ratio, centered vertically.
+	/// Clamps to image bounds.
+	/// </summary>
+	private void ExpandToRatioY (double ratioW, double ratioH)
 	{
 		double y_average = (start_pt.Y + end_pt.Y) / 2;
 		double x_distance = (end_pt.X - start_pt.X) / 2;
+		double y_distance = x_distance * ratioH / ratioW;
 
-		start_pt = start_pt with { Y = y_average - x_distance };
-		end_pt = end_pt with { Y = y_average + x_distance };
+		start_pt = start_pt with { Y = Math.Clamp (y_average - y_distance, 0, image_size.Height) };
+		end_pt = end_pt with { Y = Math.Clamp (y_average + y_distance, 0, image_size.Height) };
 	}
 
-	private void MoveActiveHandle (HandlePoint handle, double x, double y, bool shiftPressed)
+	private void MoveActiveHandle (HandlePoint handle, double x, double y,
+		bool shiftPressed, int constraintMode, double constraintW, double constraintH)
 	{
 		// Update the rectangle's size depending on which handle was dragged.
+		// constraintMode: 0 = Any Size (Shift = square), 1 = Fixed Ratio, 2 = Fixed Size.
+
+		// Unify square constraint (mode 0 + Shift) with ratio constraint (mode 1).
+		bool applyRatio = constraintMode == 1 || (constraintMode == 0 && shiftPressed);
+		double rW = constraintMode == 1 ? constraintW : 1.0;
+		double rH = constraintMode == 1 ? constraintH : 1.0;
 
 		switch (handle) {
 			case HandlePoint.UpperLeft:
 				start_pt = new (x, y);
 
-				if (shiftPressed) {
-					if (IsHigherThanWide ()) {
-						start_pt = start_pt with { X = end_pt.X - end_pt.Y + start_pt.Y };
-					} else {
-						start_pt = start_pt with { Y = end_pt.Y - end_pt.X + start_pt.X };
-					}
+				if (applyRatio) {
+					var adj = ApplyRatioWithBounds (end_pt.X, end_pt.Y, x, y, rW, rH);
+					start_pt = new (adj.X, adj.Y);
+				} else if (constraintMode == 2) {
+					start_pt = new (end_pt.X - constraintW, end_pt.Y - constraintH);
 				}
 				return;
 
@@ -237,11 +295,13 @@ public class RectangleHandle : IToolHandle
 				start_pt = start_pt with { X = x };
 				end_pt = end_pt with { Y = y };
 
-				if (shiftPressed) {
-					if (IsHigherThanWide ())
-						start_pt = start_pt with { X = end_pt.X - end_pt.Y + start_pt.Y };
-					else
-						end_pt = end_pt with { Y = start_pt.Y + end_pt.X - start_pt.X };
+				if (applyRatio) {
+					var adj = ApplyRatioWithBounds (end_pt.X, start_pt.Y, x, y, rW, rH);
+					start_pt = start_pt with { X = adj.X };
+					end_pt = end_pt with { Y = adj.Y };
+				} else if (constraintMode == 2) {
+					start_pt = start_pt with { X = end_pt.X - constraintW };
+					end_pt = end_pt with { Y = start_pt.Y + constraintH };
 				}
 				return;
 
@@ -249,54 +309,76 @@ public class RectangleHandle : IToolHandle
 				end_pt = end_pt with { X = x };
 				start_pt = start_pt with { Y = y };
 
-				if (shiftPressed) {
-					if (IsHigherThanWide ())
-						end_pt = end_pt with { X = start_pt.X + end_pt.Y - start_pt.Y };
-					else
-						start_pt = start_pt with { Y = end_pt.Y - end_pt.X + start_pt.X };
+				if (applyRatio) {
+					var adj = ApplyRatioWithBounds (start_pt.X, end_pt.Y, x, y, rW, rH);
+					end_pt = end_pt with { X = adj.X };
+					start_pt = start_pt with { Y = adj.Y };
+				} else if (constraintMode == 2) {
+					end_pt = end_pt with { X = start_pt.X + constraintW };
+					start_pt = start_pt with { Y = end_pt.Y - constraintH };
 				}
 				return;
 
 			case HandlePoint.LowerRight:
 				end_pt = new (x, y);
 
-				if (shiftPressed) {
-					if (IsHigherThanWide ())
-						end_pt = end_pt with { X = start_pt.X + end_pt.Y - start_pt.Y };
-					else
-						end_pt = end_pt with { Y = start_pt.Y + end_pt.X - start_pt.X };
+				if (applyRatio) {
+					var adj = ApplyRatioWithBounds (start_pt.X, start_pt.Y, x, y, rW, rH);
+					end_pt = new (adj.X, adj.Y);
+				} else if (constraintMode == 2) {
+					end_pt = new (start_pt.X + constraintW, start_pt.Y + constraintH);
 				}
 				return;
 
 			case HandlePoint.Left:
 				start_pt = start_pt with { X = x };
 
-				if (shiftPressed) {
-					ExpandUniformlyY ();
+				if (applyRatio) {
+					ExpandToRatioY (rW, rH);
+				} else if (constraintMode == 2) {
+					end_pt = end_pt with { X = start_pt.X + constraintW };
+					double cy = (start_pt.Y + end_pt.Y) / 2;
+					start_pt = start_pt with { Y = cy - constraintH / 2 };
+					end_pt = end_pt with { Y = cy + constraintH / 2 };
 				}
 				return;
 
 			case HandlePoint.Up:
 				start_pt = start_pt with { Y = y };
 
-				if (shiftPressed) {
-					ExpandUniformlyX ();
+				if (applyRatio) {
+					ExpandToRatioX (rW, rH);
+				} else if (constraintMode == 2) {
+					end_pt = end_pt with { Y = start_pt.Y + constraintH };
+					double cx = (start_pt.X + end_pt.X) / 2;
+					start_pt = start_pt with { X = cx - constraintW / 2 };
+					end_pt = end_pt with { X = cx + constraintW / 2 };
 				}
 				return;
 
 			case HandlePoint.Right:
 				end_pt = end_pt with { X = x };
 
-				if (shiftPressed) {
-					ExpandUniformlyY ();
+				if (applyRatio) {
+					ExpandToRatioY (rW, rH);
+				} else if (constraintMode == 2) {
+					start_pt = start_pt with { X = end_pt.X - constraintW };
+					double cy = (start_pt.Y + end_pt.Y) / 2;
+					start_pt = start_pt with { Y = cy - constraintH / 2 };
+					end_pt = end_pt with { Y = cy + constraintH / 2 };
 				}
 				return;
 
 			case HandlePoint.Down:
 				end_pt = end_pt with { Y = y };
 
-				if (shiftPressed) {
-					ExpandUniformlyX ();
+				if (applyRatio) {
+					ExpandToRatioX (rW, rH);
+				} else if (constraintMode == 2) {
+					start_pt = start_pt with { Y = end_pt.Y - constraintH };
+					double cx = (start_pt.X + end_pt.X) / 2;
+					start_pt = start_pt with { X = cx - constraintW / 2 };
+					end_pt = end_pt with { X = cx + constraintW / 2 };
 				}
 				return;
 

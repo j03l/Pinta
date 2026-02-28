@@ -7,11 +7,9 @@ namespace Pinta.Core;
 
 public sealed class ToolBarDropDownButton : Gtk.MenuButton
 {
-	private const string ACTION_PREFIX = "tool";
-
 	private readonly bool show_label;
-	private readonly Gio.Menu dropdown;
-	private readonly Gio.SimpleActionGroup action_group;
+	private readonly Gtk.ListBox listbox;
+	private readonly Gtk.Popover popover;
 	private ToolBarItem? selected_item;
 
 	private readonly List<ToolBarItem> items;
@@ -24,12 +22,19 @@ public sealed class ToolBarDropDownButton : Gtk.MenuButton
 		items = [];
 		Items = new ReadOnlyCollection<ToolBarItem> (items);
 		AlwaysShowArrow = true;
+		FocusOnClick = false;
 
-		dropdown = Gio.Menu.New ();
-		MenuModel = dropdown;
+		listbox = Gtk.ListBox.New ();
+		listbox.SelectionMode = Gtk.SelectionMode.Browse;
+		listbox.AddCssClass ("pinta-dropdown");
+		listbox.OnRowActivated += OnRowActivated;
 
-		action_group = Gio.SimpleActionGroup.New ();
-		InsertActionGroup (ACTION_PREFIX, action_group);
+		popover = Gtk.Popover.New ();
+		popover.HasArrow = false;
+		popover.SetOffset (0, 6);
+		popover.Child = listbox;
+
+		Popover = popover;
 	}
 
 	public ToolBarItem AddItem (string text, string imageId)
@@ -40,11 +45,24 @@ public sealed class ToolBarDropDownButton : Gtk.MenuButton
 	public ToolBarItem AddItem (string text, string imageId, object? tag)
 	{
 		ToolBarItem item = new ToolBarItem (text, imageId, tag);
-		action_group.AddAction (item.Action);
-		dropdown.AppendItem (Gio.MenuItem.New (text, $"{ACTION_PREFIX}.{item.Action.Name}"));
 
+		var row = new Gtk.Box ();
+		row.SetOrientation (Gtk.Orientation.Horizontal);
+		row.Spacing = 6;
+
+		var icon = Gtk.Image.NewFromIconName (imageId);
+		row.Append (icon);
+
+		var label = Gtk.Label.New (text);
+		label.Halign = Gtk.Align.Start;
+		row.Append (label);
+
+		var listBoxRow = new Gtk.ListBoxRow ();
+		listBoxRow.Child = row;
+		listbox.Append (listBoxRow);
+
+		item.Row = listBoxRow;
 		items.Add (item);
-		item.Action.OnActivate += delegate { SetSelectedItem (item); };
 
 		if (selected_item == null)
 			SetSelectedItem (item);
@@ -83,10 +101,23 @@ public sealed class ToolBarDropDownButton : Gtk.MenuButton
 		selected_item = item;
 		TooltipText = item.Text;
 
+		if (item.Row is not null)
+			listbox.SelectRow (item.Row);
+
 		if (show_label)
 			Label = item.Text;
 
 		OnSelectedItemChanged ();
+	}
+
+	private void OnRowActivated (Gtk.ListBox sender, Gtk.ListBox.RowActivatedSignalArgs args)
+	{
+		var item = items.FirstOrDefault (i => i.Row == args.Row);
+		if (item is not null && item != selected_item) {
+			SetSelectedItem (item);
+		}
+
+		popover.Popdown ();
 	}
 
 	private void OnSelectedItemChanged ()
@@ -103,11 +134,8 @@ public sealed class ToolBarItem
 
 	public ToolBarItem (string text, string imageId, object? tag)
 	{
-		var actionName = AdjustName (text);
-
 		Text = text;
 		ImageId = imageId;
-		Action = Gio.SimpleAction.New (actionName, null);
 		Tag = tag;
 	}
 
@@ -117,7 +145,11 @@ public sealed class ToolBarItem
 	public string ImageId { get; }
 	public object? Tag { get; }
 	public string Text { get; }
-	public Gio.SimpleAction Action { get; }
+
+	/// <summary>
+	/// The ListBoxRow associated with this item (set internally by ToolBarDropDownButton).
+	/// </summary>
+	internal Gtk.ListBoxRow? Row { get; set; }
 
 	public T GetTagOrDefault<T> (T defaultValue)
 		=> Tag is T value ? value : defaultValue;
